@@ -23,14 +23,13 @@ module.exports = merge(common, {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      template: '../public/index.html',
+      template: 'public/index.html',
       filename: 'index.html',
       inject: 'body',
       minify: {
         removeComments: true,
       },
     }),
-  ],
-  new CleanWebpackPlugin(),
+    new CleanWebpackPlugin(),
   ],
 });
