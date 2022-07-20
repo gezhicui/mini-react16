@@ -16,5 +16,4 @@ let element = (
   </div>
 )
 
-console.log(element);
-//ReactDOM.render(element, document.querySelector('#root'));
+ReactDOM.render(element, document.querySelector('#root'));

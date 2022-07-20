@@ -17,7 +17,6 @@ import { ELEMENT_TEXT } from './constants'
  */
 
 function createElement(type, config, ...children) {
-  console.log('create tlemtet', type, config, ...children);
   return {
     type,
     props: {
