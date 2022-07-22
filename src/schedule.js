@@ -80,6 +80,10 @@ function completeUnitOfWork(currentFiber) {
 function beginWork(currentFiber) {
   if (currentFiber.tag === TAG_ROOT) {
     updateHostRoot(currentFiber);
+  } else if (currentFiber.tag === TAG_TEXT) {
+    //TODO
+  } else if (currentFiber.tag === TAG_HOST) {
+    //TODO
   }
 }
 
