@@ -1,4 +1,5 @@
 import { TAG_ROOT, ELEMENT_TEXT, TAG_HOST, TAG_TEXT, PLACEMENT } from "./constants";
+import { setProps } from './utils'
 
 let nextUnitOfWork = null; //下一个工作单元
 let workInProgressRoot = null;//RootFiber应用的根
@@ -79,11 +80,27 @@ function completeUnitOfWork(currentFiber) {
  */
 function beginWork(currentFiber) {
   if (currentFiber.tag === TAG_ROOT) {
+    //根节点
     updateHostRoot(currentFiber);
   } else if (currentFiber.tag === TAG_TEXT) {
-    //TODO
+    //文本节点
+    updateHostText(currentFiber);
   } else if (currentFiber.tag === TAG_HOST) {
-    //TODO
+    //原生dom节点
+    updateHost(currentFiber)
+  }
+}
+
+function createDom(currentFiber) {
+  //文本节点
+  if (currentFiber.tag === TAG_TEXT) {
+    return document.createTextNode(currentFiber.props.text);
+  } else if (currentFiber.tag === TAG_HOST) {
+    // 其他原生dom节点 如div span
+    let stateNode = document.createElement(currentFiber.type);
+    //处理属性
+    setProps(stateNode, {}, currentFiber.props);
+    return stateNode;
   }
 }
 
@@ -91,6 +108,21 @@ function updateHostRoot(currentFiber) {
   //先处理自己 如果是一个原生节点，创建真实DOM 2.创建子fiber
   let newChildren = currentFiber.props.children;//[element]
   reconcileChildren(currentFiber, newChildren);//reconcile协调
+}
+
+function updateHostText(currentFiber) {
+  if (!currentFiber.stateNode) {//如果此fiber没有创建DOM节点
+    currentFiber.stateNode = createDom(currentFiber);
+  }
+}
+
+
+function updateHost(currentFiber) {
+  if (!currentFiber.stateNode) {//如果此fiber没有创建DOM节点
+    currentFiber.stateNode = createDom(currentFiber);
+  }
+  const newChildren = currentFiber.props.children;
+  reconcileChildren(currentFiber, newChildren);
 }
 
 function reconcileChildren(currentFiber, newChildren) {
