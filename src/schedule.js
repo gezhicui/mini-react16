@@ -17,7 +17,7 @@ let workInProgressRoot = null;//RootFiber应用的根
 export function scheduleRoot(rootFiber) {
   workInProgressRoot = rootFiber;
   nextUnitOfWork = rootFiber;
-  console.log(workInProgressRoot, nextUnitOfWork);
+  console.log('rootFiber', rootFiber);
 }
 
 // 每一帧需要穿插执行的内容
@@ -30,6 +30,7 @@ function performUnitOfWork(currentFiber) {
   while (currentFiber) {
     //完成当前节点
     completeUnitOfWork(currentFiber);
+    console.log(currentFiber);
     //有弟弟返回弟弟
     if (currentFiber.sibling) {
       return currentFiber.sibling; //有弟弟返回弟弟
@@ -47,8 +48,10 @@ function performUnitOfWork(currentFiber) {
  * @param {*} currentFiber 
  */
 function completeUnitOfWork(currentFiber) {
+  // returnFiber是当前节点父节点
   let returnFiber = currentFiber.return;
   if (returnFiber) {
+    //  -------- 把自己儿子的effect链挂到父亲身上
     if (!returnFiber.firstEffect) {
       returnFiber.firstEffect = currentFiber.firstEffect;
     }
@@ -58,7 +61,7 @@ function completeUnitOfWork(currentFiber) {
       }
       returnFiber.lastEffect = currentFiber.lastEffect;
     }
-
+    //  -----------  把自己挂到父亲身上
     const effectTag = currentFiber.effectTag;
     if (effectTag) { //如果有副作用，（第一次时肯定有，新增默认PLACEMENT）
       if (returnFiber.lastEffect) {
@@ -89,6 +92,7 @@ function beginWork(currentFiber) {
     //原生dom节点
     updateHost(currentFiber)
   }
+  // console.log('beginWork', currentFiber);
 }
 
 function createDom(currentFiber) {
@@ -126,7 +130,6 @@ function updateHost(currentFiber) {
 }
 
 function reconcileChildren(currentFiber, newChildren) {
-  console.log('currentFiber, newChildren', currentFiber, newChildren);
   let newChildIndex = 0;//新子节点的索引
   let prevSibiling;//上一个新的子fiber
   //遍历我们子虚拟DOM元素数组，为每一个虚拟DOM创建子Fiber
@@ -161,6 +164,25 @@ function reconcileChildren(currentFiber, newChildren) {
   }
 }
 
+function commitRoot() {
+  let currentFiber = workInProgressRoot.firstEffect;
+  while (currentFiber) {
+    commitWork(currentFiber);
+    currentFiber = currentFiber.nextEffect;
+  }
+  workInProgressRoot = null;
+}
+function commitWork(currentFiber) {
+  if (!currentFiber) return;
+  let returnFiber = currentFiber.return;
+  let returnDOM = returnFiber.stateNode;
+  //console.log(currentFiber)
+  if (currentFiber.effectTag === PLACEMENT) {
+    returnDOM.appendChild(currentFiber.stateNode);
+  }
+  currentFiber.effectTag = null;
+}
+
 /**
  * 回调返回浏览器空闲时间，判断是否继续执行任务
  * @param {*} deadline 
@@ -169,17 +191,15 @@ function workLoop(deadline) {
   let shouldYield = false; //react是否要让出时间或说控制权
   while (nextUnitOfWork && !shouldYield) {
     nextUnitOfWork = performUnitOfWork(nextUnitOfWork);
-    console.log(nextUnitOfWork);
     shouldYield = deadline.timeRemaining() < 1;
   }
   if (!nextUnitOfWork && workInProgressRoot) {
-    //console.log('render阶段结束');
-    //commitRoot();
+    console.log('render阶段结束');
+    commitRoot();
   }
   //每一帧都要执行这个代码
   window.requestIdleCallback(workLoop, { timeout: 500 });
 }
-
 
 //react询问浏览器是否空闲,这里有个优先级的概念 expirationTime
 window.requestIdleCallback(workLoop, { timeout: 500 });
