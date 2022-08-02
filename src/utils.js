@@ -2,7 +2,7 @@
 export function setProps(dom, oldProps, newProps) {
   for (let key in oldProps) {
     if (key !== 'children') {
-      if (newProps.hasOwnProperty('key')) {//新老都有更新
+      if (newProps.hasOwnProperty('key')) {//新老都有,就更新
         setProp(dom, key, newProps[key]);
       } else {//老的有新的没有删除
         dom.removeAttribute(key);
