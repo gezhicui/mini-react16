@@ -1,6 +1,5 @@
 import { TAG_ROOT, ELEMENT_TEXT, TAG_HOST, TAG_TEXT, PLACEMENT, DELETION, UPDATE } from "./constants";
 import { setProps } from './utils'
-
 let nextUnitOfWork = null; //下一个工作单元
 let workInProgressRoot = null;//RootFiber应用的根
 let currentRoot = null; //渲染成功后的当前根rootFiber
@@ -16,31 +15,32 @@ let deletions = [];//删除的节点不放在effect list 要单独记录并执�
  * @param {tag:TAG_ROOT,stateNode:container,props:{children:[element]} rootFiber 
  */
 export function scheduleRoot(rootFiber) {
-  if (currentRoot) {//至少渲染过一次
-    rootFiber.alternate = currentRoot
-    workInProgressRoot = rootFiber
-  } else {
+  if (currentRoot && currentRoot.alternate) { //这就是第二次之后渲染，不能每次都创建树，如起始时可以把第一个树赋给第三个
+    workInProgressRoot = currentRoot.alternate;
+    workInProgressRoot.props = rootFiber.props;//让他的props更新成新的
+    workInProgressRoot.alternate = currentRoot;//他的替身指向当前树
+  } else if (currentRoot) {//第一次更新
+    rootFiber.alternate = currentRoot;
+    workInProgressRoot = rootFiber;
+  } else {//如果是第一次渲染
     workInProgressRoot = rootFiber;
   }
+  //清空指针
+  workInProgressRoot.firstEffect = workInProgressRoot.lastEffect = workInProgressRoot.nextEffect = null;
   nextUnitOfWork = workInProgressRoot;
 }
 
-// 每一帧需要穿插执行的内容
 function performUnitOfWork(currentFiber) {
   beginWork(currentFiber);
   if (currentFiber.child) {
     return currentFiber.child; //有孩子返回孩子
   }
-  // 没孩子
   while (currentFiber) {
-    //完成当前节点
     completeUnitOfWork(currentFiber);
-    //有弟弟返回弟弟
     if (currentFiber.sibling) {
       return currentFiber.sibling; //有弟弟返回弟弟
     }
-    //没弟弟找到父亲继续执行
-    currentFiber = currentFiber.return;
+    currentFiber = currentFiber.return; //返回父亲
 
   }
 }
@@ -52,10 +52,8 @@ function performUnitOfWork(currentFiber) {
  * @param {*} currentFiber 
  */
 function completeUnitOfWork(currentFiber) {
-  // returnFiber是当前节点父节点
   let returnFiber = currentFiber.return;
   if (returnFiber) {
-    //  -------- 把自己儿子的effect链挂到父亲身上
     if (!returnFiber.firstEffect) {
       returnFiber.firstEffect = currentFiber.firstEffect;
     }
@@ -65,7 +63,7 @@ function completeUnitOfWork(currentFiber) {
       }
       returnFiber.lastEffect = currentFiber.lastEffect;
     }
-    //  -----------  把自己挂到父亲身上
+
     const effectTag = currentFiber.effectTag;
     if (effectTag) { //如果有副作用，（第一次时肯定有，新增默认PLACEMENT）
       if (returnFiber.lastEffect) {
@@ -87,25 +85,19 @@ function completeUnitOfWork(currentFiber) {
  */
 function beginWork(currentFiber) {
   if (currentFiber.tag === TAG_ROOT) {
-    //根节点
     updateHostRoot(currentFiber);
   } else if (currentFiber.tag === TAG_TEXT) {
-    //文本节点
     updateHostText(currentFiber);
   } else if (currentFiber.tag === TAG_HOST) {
-    //原生dom节点
     updateHost(currentFiber)
   }
 }
 
 function createDom(currentFiber) {
-  //文本节点
   if (currentFiber.tag === TAG_TEXT) {
     return document.createTextNode(currentFiber.props.text);
   } else if (currentFiber.tag === TAG_HOST) {
-    // 其他原生dom节点 如div span
     let stateNode = document.createElement(currentFiber.type);
-    //处理属性
     updateDOM(stateNode, {}, currentFiber.props);
     return stateNode;
   }
@@ -137,6 +129,12 @@ function updateHost(currentFiber) {
   reconcileChildren(currentFiber, newChildren);
 }
 
+
+/**
+ * 调和
+ * @param {*} currentFiber 
+ * @param {*} newChildren 
+ */
 function reconcileChildren(currentFiber, newChildren) {
   let newChildIndex = 0;//新子节点的索引
   //如果说当前的currentFiber有alternate属性并且alternate有child属性
@@ -201,6 +199,7 @@ function reconcileChildren(currentFiber, newChildren) {
 }
 
 
+
 function commitRoot() {
   deletions.forEach(commitWork);//执行 effect list之前先把该删除的元素删除
   let currentFiber = workInProgressRoot.firstEffect;
@@ -235,7 +234,6 @@ function commitWork(currentFiber) {
   }
   currentFiber.effectTag = null;
 }
-
 /**
  * 回调返回浏览器空闲时间，判断是否继续执行任务
  * @param {*} deadline 
@@ -247,12 +245,11 @@ function workLoop(deadline) {
     shouldYield = deadline.timeRemaining() < 1;
   }
   if (!nextUnitOfWork && workInProgressRoot) {
-    console.log('render阶段结束');
+    // console.log('render阶段结束');
     commitRoot();
   }
   //每一帧都要执行这个代码
   window.requestIdleCallback(workLoop, { timeout: 500 });
 }
-
 //react询问浏览器是否空闲,这里有个优先级的概念 expirationTime
 window.requestIdleCallback(workLoop, { timeout: 500 });
