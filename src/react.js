@@ -53,6 +53,8 @@ Component.prototype.isReactComponent = {}; //类组件
 
 const React = {
   createElement,
-  Component
+  Component,
+  useReducer,
+  useState
 }
 export default React;

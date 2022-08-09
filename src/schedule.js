@@ -5,6 +5,8 @@ let nextUnitOfWork = null; //下一个工作单元
 let workInProgressRoot = null;//RootFiber应用的根
 let currentRoot = null; //渲染成功后的当前根rootFiber
 let deletions = [];//删除的节点不放在effect list 要单独记录并执行
+let workInProgressFiber = null; //正在工作中的fiber
+let hookIndex = 0;//hooks索引
 /**
  * 从根节点开始渲染和调度
  * 两个阶段（diff+render阶段，commit阶段）
@@ -100,9 +102,18 @@ function beginWork(currentFiber) {
     updateHost(currentFiber);
   } else if (currentFiber.tag === TAG_CLASS) {
     updateClassComponent(currentFiber);
+  } else if (currentFiber.tag === TAG_FUNCTION_COMPONENT) {
+    updateFunctionComponent(currentFiber);
   }
 }
 
+function updateFunctionComponent(currentFiber) {
+  workInProgressFiber = currentFiber;
+  hookIndex = 0;
+  workInProgressFiber.hooks = [];
+  const newChildren = [currentFiber.type(currentFiber.props)];
+  reconcileChildren(currentFiber, newChildren);
+}
 
 function updateClassComponent(currentFiber) {
   if (!currentFiber.stateNode) { //类组件 stateNode是组件的实例
@@ -178,6 +189,8 @@ function reconcileChildren(currentFiber, newChildren) {
     let tag;
     if (newChild && typeof newChild.type == 'function' && newChild.type.prototype.isReactComponent) {
       tag = TAG_CLASS;
+    } else if (newChild && typeof newChild.type == 'function') {
+      tag = TAG_FUNCTION_COMPONENT;
     } else if (newChild && newChild.type == ELEMENT_TEXT) {
       tag = TAG_TEXT;
     } else if (newChild && typeof newChild.type === 'string') {
@@ -315,6 +328,31 @@ function commitDeletion(currentFiber, domReturn) {
   }
 }
 
+export function useReducer(reducer, initiaValue) {
+  let newHook = workInProgressFiber.alternate && workInProgressFiber.alternate.hooks
+    && workInProgressFiber.alternate.hooks[hookIndex];
+  if (newHook) {//第二次渲染 YODO
+    newHook.state = newHook.updateQueue.forceUpdate(newHook.state);
+  } else {
+    newHook = {
+      state: initiaValue,
+      updateQueue: new UpdateQueue() //空的更新队列
+    }
+  }
+  const dispatch = action => { //{type:'ADD'}
+    let payload = reducer ? reducer(newHook.state, action) : action;
+    newHook.updateQueue.enqueueUpdate(
+      new Update(payload)
+    );
+    scheduleRoot();
+  }
+  workInProgressFiber.hooks[hookIndex++] = newHook;
+  return [newHook.state, dispatch];
+}
+
+export function useState(initiaValue) {
+  return useReducer(null, initiaValue);
+}
 
 //react询问浏览器是否空闲,这里有个优先级的概念 expirationTime
 window.requestIdleCallback(workLoop, { timeout: 500 });
